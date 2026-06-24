@@ -12,22 +12,14 @@ def get_user_by_email(
     db: Session,
     email: str,
 ) -> User | None:
-    return (
-        db.query(User)
-        .filter(User.email == email)
-        .first()
-    )
+    return db.query(User).filter(User.email == email).first()
 
 
 def get_user_by_username(
     db: Session,
     username: str,
 ) -> User | None:
-    return (
-        db.query(User)
-        .filter(User.username == username)
-        .first()
-    )
+    return db.query(User).filter(User.username == username).first()
 
 
 def create_user(
@@ -37,9 +29,7 @@ def create_user(
     user = User(
         username=user_data.username,
         email=user_data.email,
-        password_hash=hash_password(
-            user_data.password
-        ),
+        password_hash=hash_password(user_data.password),
     )
 
     db.add(user)

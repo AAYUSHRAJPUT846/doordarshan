@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.security import create_access_token
 from app.crud.crud_user import (
     authenticate_user,
     create_user,
     get_user_by_email,
     get_user_by_username,
 )
-from app.core.security import create_access_token
 from app.db.base import get_db
 from app.schemas.user import (
     Token,
@@ -15,7 +15,6 @@ from app.schemas.user import (
     UserLogin,
     UserResponse,
 )
-
 
 router = APIRouter(
     prefix="/auth",
@@ -76,9 +75,7 @@ def login(
             detail="Invalid credentials",
         )
 
-    access_token = create_access_token(
-        str(user.id)
-    )
+    access_token = create_access_token(str(user.id))
 
     return Token(
         access_token=access_token,
