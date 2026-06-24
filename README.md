@@ -1,6 +1,6 @@
 # Doordarshan
 
-An open-source video conferencing application built with FastAPI for fast and reliable real-time communication.
+Open-source video conferencing built with FastAPI for seamless real-time communication.
 
 ## Status
 Added user authentication and initial database migration.
