@@ -22,6 +22,16 @@ def get_user_by_username(
     return db.query(User).filter(User.username == username).first()
 
 
+def get_user_by_id(
+    db: Session,
+    user_id: int,
+) -> User | None:
+    return db.get(
+        User,
+        user_id,
+    )
+
+
 def create_user(
     db: Session,
     user_data: UserCreate,
@@ -49,7 +59,7 @@ def authenticate_user(
         email,
     )
 
-    if not user:
+    if user is None:
         return None
 
     if not verify_password(
