@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, status
 
+from app.api.dependencies import DBSession
 from app.core.security import create_access_token
 from app.crud.crud_user import (
     authenticate_user,
@@ -8,7 +8,6 @@ from app.crud.crud_user import (
     get_user_by_email,
     get_user_by_username,
 )
-from app.db.base import get_db
 from app.schemas.user import (
     Token,
     UserCreate,
@@ -29,30 +28,23 @@ router = APIRouter(
 )
 def register(
     user_data: UserCreate,
-    db: Session = Depends(get_db),
-):
-    if get_user_by_email(
-        db,
-        user_data.email,
-    ):
+    db: DBSession,
+) -> UserResponse:
+    if get_user_by_email(db, user_data.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email already registered",
         )
 
-    if get_user_by_username(
-        db,
-        user_data.username,
-    ):
+    if get_user_by_username(db, user_data.username):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Username already taken",
         )
 
-    return create_user(
-        db,
-        user_data,
-    )
+    user = create_user(db, user_data)
+
+    return UserResponse.model_validate(user)
 
 
 @router.post(
@@ -61,15 +53,15 @@ def register(
 )
 def login(
     credentials: UserLogin,
-    db: Session = Depends(get_db),
-):
+    db: DBSession,
+) -> Token:
     user = authenticate_user(
         db,
         credentials.email,
         credentials.password,
     )
 
-    if not user:
+    if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid credentials",
@@ -77,6 +69,4 @@ def login(
 
     access_token = create_access_token(str(user.id))
 
-    return Token(
-        access_token=access_token,
-    )
+    return Token(access_token=access_token)

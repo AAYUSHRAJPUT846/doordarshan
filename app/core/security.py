@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import cast
 
 from jose import jwt
 from pwdlib import PasswordHash
@@ -25,15 +26,19 @@ def verify_password(
 def create_access_token(
     subject: str,
 ) -> str:
-    expire = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
+    expire = datetime.now(UTC) + timedelta(
+        minutes=settings.access_token_expire_minutes,
+    )
 
     payload = {
         "sub": subject,
         "exp": expire,
     }
 
-    return jwt.encode(
+    token = jwt.encode(
         payload,
         settings.secret_key,
         algorithm=settings.algorithm,
     )
+
+    return cast(str, token)
