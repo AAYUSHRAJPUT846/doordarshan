@@ -37,7 +37,7 @@ format:
 	ruff check app tests --fix
 
 lint:
-	ruff check app tests --fix
+	ruff check app tests
 	mypy app
 
 check: format lint test
