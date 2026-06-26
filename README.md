@@ -1,10 +1,10 @@
 # Doordarshan
 
-> An open-source video conferencing backend built with **FastAPI**, **WebRTC Signaling**, **WebSockets**, **SQLAlchemy**, and **Alembic**.
+> An open-source video conferencing application built with FastAPI, WebRTC, WebSockets, SQLAlchemy, and Alembic.
 
-Doordarshan is a modern backend service that powers real-time video conferencing applications. It provides secure authentication, meeting management, participant management, room management, and WebRTC signaling over WebSockets.
+Doordarshan is an open-source video conferencing application designed for secure and reliable real-time communication. It combines authentication, meeting management, participant management, room management, and WebRTC signaling into a clean and scalable architecture.
 
-The goal of this project is to create a clean, scalable, and production-ready backend that is easy to understand, extend, and contribute to.
+The project aims to demonstrate modern software engineering practices while providing a solid foundation for building real-time communication applications. It is designed to be easy to understand, extend, and contribute to.
 
 ---
 
