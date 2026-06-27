@@ -10,23 +10,26 @@ class MeetingBase(BaseModel):
         ...,
         min_length=1,
         max_length=100,
+        description="Meeting title.",
     )
     description: str | None = Field(
         default=None,
         max_length=500,
+        description="Optional meeting description.",
     )
     room_id: int | None = Field(
         default=None,
-        description="Optional room ID associated with the meeting.",
+        gt=0,
+        description="Optional room associated with the meeting.",
     )
     scheduled_at: datetime | None = Field(
         default=None,
-        description="Optional scheduled time for the meeting.",
+        description="Scheduled start time of the meeting.",
     )
 
 
 class MeetingCreate(MeetingBase):
-    pass
+    """Schema used when creating a meeting."""
 
 
 class MeetingUpdate(BaseModel):
@@ -34,20 +37,26 @@ class MeetingUpdate(BaseModel):
         default=None,
         min_length=1,
         max_length=100,
+        description="Meeting title.",
     )
     description: str | None = Field(
         default=None,
         max_length=500,
+        description="Optional meeting description.",
     )
     room_id: int | None = Field(
         default=None,
-        description="Optional room ID associated with the meeting.",
+        gt=0,
+        description="Optional room associated with the meeting.",
     )
     scheduled_at: datetime | None = Field(
         default=None,
-        description="Optional scheduled time for the meeting.",
+        description="Scheduled start time of the meeting.",
     )
-    is_active: bool | None = None
+    is_active: bool | None = Field(
+        default=None,
+        description="Whether the meeting is active.",
+    )
 
 
 class MeetingResponse(MeetingBase):
@@ -56,4 +65,6 @@ class MeetingResponse(MeetingBase):
     is_active: bool
     created_at: datetime
 
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+    )

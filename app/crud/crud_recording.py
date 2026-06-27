@@ -5,12 +5,25 @@ from app.models.recording import Recording
 from app.schemas.recording import RecordingCreate
 
 
-def get_recording_by_id(db: Session, recording_id: int) -> Recording | None:
-    return db.scalar(select(Recording).where(Recording.id == recording_id))
+def get_recording_by_id(
+    db: Session,
+    recording_id: int,
+) -> Recording | None:
+    return db.scalar(
+        select(Recording).where(
+            Recording.id == recording_id,
+        ),
+    )
 
 
-def get_recordings(db: Session) -> list[Recording]:
-    return list(db.scalars(select(Recording)).all())
+def get_recordings(
+    db: Session,
+) -> list[Recording]:
+    return list(
+        db.scalars(
+            select(Recording),
+        ),
+    )
 
 
 def create_recording(
@@ -32,6 +45,9 @@ def create_recording(
     return db_recording
 
 
-def delete_recording(db: Session, recording: Recording) -> None:
+def delete_recording(
+    db: Session,
+    recording: Recording,
+) -> None:
     db.delete(recording)
     db.commit()

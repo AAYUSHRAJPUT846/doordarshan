@@ -5,12 +5,25 @@ from app.models.meeting import Meeting
 from app.schemas.meeting import MeetingCreate
 
 
-def get_meeting_by_id(db: Session, meeting_id: int) -> Meeting | None:
-    return db.scalar(select(Meeting).where(Meeting.id == meeting_id))
+def get_meeting_by_id(
+    db: Session,
+    meeting_id: int,
+) -> Meeting | None:
+    return db.scalar(
+        select(Meeting).where(
+            Meeting.id == meeting_id,
+        ),
+    )
 
 
-def get_meetings(db: Session) -> list[Meeting]:
-    return list(db.scalars(select(Meeting)).all())
+def get_meetings(
+    db: Session,
+) -> list[Meeting]:
+    return list(
+        db.scalars(
+            select(Meeting),
+        ),
+    )
 
 
 def create_meeting(
@@ -23,10 +36,8 @@ def create_meeting(
         description=meeting.description,
         host_id=host_id,
         room_id=meeting.room_id,
+        scheduled_at=meeting.scheduled_at,
     )
-
-    if meeting.scheduled_at is not None:
-        db_meeting.scheduled_at = meeting.scheduled_at
 
     db.add(db_meeting)
     db.commit()
@@ -51,6 +62,9 @@ def update_meeting(
     return meeting
 
 
-def delete_meeting(db: Session, meeting: Meeting) -> None:
+def delete_meeting(
+    db: Session,
+    meeting: Meeting,
+) -> None:
     db.delete(meeting)
     db.commit()
