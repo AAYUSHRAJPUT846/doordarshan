@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Create Account — Doordarshan</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+      .auth-page::before {
+        content: "";
+        position: fixed;
+        top: -40%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(
+          circle,
+          rgba(33, 136, 255, 0.07) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      /* Password strength bar */
+      .strength-bar {
+        height: 3px;
+        border-radius: 2px;
+        background: var(--border);
+        overflow: hidden;
+        margin-top: 0.375rem;
+      }
+      .strength-fill {
+        height: 100%;
+        border-radius: 2px;
+        transition:
+          width 0.3s,
+          background 0.3s;
+        width: 0%;
+        background: var(--danger);
+      }
+      .strength-label {
+        font-size: 0.75rem;
+        color: var(--text-faint);
+        margin-top: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="auth-page">
+      <div class="auth-card">
+        <div class="auth-logo">
+          <div class="auth-logo-icon">📡</div>
+          Doordarshan
+        </div>
+
+        <h2 style="margin-bottom: 0.25rem">Create your account</h2>
+        <p
+          class="text-muted"
+          style="font-size: 0.875rem; margin-bottom: 1.5rem"
+        >
+          Free, open-source, and private.
+        </p>
+
+        <div
+          id="register-error"
+          class="form-error"
+          style="
+            padding: 0.625rem 0.875rem;
+            background: rgba(248, 81, 73, 0.08);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+          "
+        ></div>
+
+        <form class="auth-form" id="register-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="username">Username</label>
+            <input
+              class="form-input"
+              type="text"
+              id="username"
+              name="username"
+              placeholder="3–50 characters"
+              autocomplete="username"
+              minlength="3"
+              maxlength="50"
+              required
+            />
+            <span class="form-hint">Letters, numbers, and underscores.</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input
+              class="form-input"
+              type="email"
+              id="email"
+              name="email"
+              placeholder="you@example.com"
+              autocomplete="email"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input
+              class="form-input"
+              type="password"
+              id="password"
+              name="password"
+              placeholder="At least 8 characters"
+              autocomplete="new-password"
+              minlength="8"
+              required
+            />
+            <div class="strength-bar">
+              <div class="strength-fill" id="strength-fill"></div>
+            </div>
+            <span class="strength-label" id="strength-label"></span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="confirm-password"
+              >Confirm password</label
+            >
+            <input
+              class="form-input"
+              type="password"
+              id="confirm-password"
+              name="confirm-password"
+              placeholder="Repeat password"
+              autocomplete="new-password"
+              required
+            />
+            <span class="form-error" id="pw-match-error"
+              >Passwords do not match.</span
+            >
+          </div>
+
+          <button
+            class="btn btn-primary btn-lg w-full"
+            type="submit"
+            id="register-btn"
+            style="margin-top: 0.5rem"
+          >
+            Create Account
+          </button>
+        </form>
+
+        <p class="auth-divider">
+          Already have an account? <a href="index.html">Sign in</a>
+        </p>
+      </div>
+    </main>
+
+    <div id="toast-container"></div>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+      "use strict";
+      const authUtils = window.DoordarshAuth;
+      const api = window.DoordarshApi;
+
+      authUtils.redirectIfAuthed();
+
+      const form = document.getElementById("register-form");
+      const usernameEl = document.getElementById("username");
+      const emailEl = document.getElementById("email");
+      const passEl = document.getElementById("password");
+      const confirmEl = document.getElementById("confirm-password");
+      const errorEl = document.getElementById("register-error");
+      const pwMatchErr = document.getElementById("pw-match-error");
+      const registerBtn = document.getElementById("register-btn");
+      const fillEl = document.getElementById("strength-fill");
+      const labelEl = document.getElementById("strength-label");
+
+      /* -- Password strength meter -- */
+      passEl.addEventListener("input", () => {
+        const v = passEl.value;
+        let score = 0;
+        if (v.length >= 8) score++;
+        if (/[A-Z]/.test(v)) score++;
+        if (/[0-9]/.test(v)) score++;
+        if (/[^A-Za-z0-9]/.test(v)) score++;
+
+        const pct = (score / 4) * 100;
+        const color =
+          ["var(--danger)", "var(--warning)", "var(--info)", "var(--success)"][
+            score - 1
+          ] ?? "var(--border)";
+        const label = ["", "Weak", "Fair", "Good", "Strong"][score] ?? "";
+
+        fillEl.style.width = `${pct}%`;
+        fillEl.style.background = color;
+        labelEl.textContent = label;
+      });
+
+      /* -- Password match validation -- */
+      confirmEl.addEventListener("input", () => {
+        const mismatch = confirmEl.value && passEl.value !== confirmEl.value;
+        pwMatchErr.classList.toggle("visible", mismatch);
+      });
+
+      function showError(msg) {
+        errorEl.textContent = msg;
+        errorEl.classList.add("visible");
+      }
+      function clearError() {
+        errorEl.classList.remove("visible");
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearError();
+
+        const username = usernameEl.value.trim();
+        const email = emailEl.value.trim();
+        const password = passEl.value;
+        const confirm = confirmEl.value;
+
+        if (!username || !email || !password) {
+          showError("All fields are required.");
+          return;
+        }
+        if (username.length < 3) {
+          showError("Username must be at least 3 characters.");
+          return;
+        }
+        if (password.length < 8) {
+          showError("Password must be at least 8 characters.");
+          return;
+        }
+        if (password !== confirm) {
+          showError("Passwords do not match.");
+          return;
+        }
+
+        registerBtn.disabled = true;
+        registerBtn.innerHTML =
+          '<span class="spinner"></span> Creating account…';
+
+        try {
+          const user = await api.register({ username, email, password });
+
+          // Auto-login after registration
+          const { access_token } = await api.login({ email, password });
+          authUtils.saveToken(access_token, false);
+          authUtils.saveUser({
+            id: user.id,
+            username: user.username,
+            email: user.email,
+          });
+
+          window.location.href = "dashboard.html";
+        } catch (err) {
+          showError(
+            err.message ||
+              "Registration failed. Try a different username or email.",
+          );
+          registerBtn.disabled = false;
+          registerBtn.textContent = "Create Account";
+        }
+      });
+    </script>
+  </body>
+</html>

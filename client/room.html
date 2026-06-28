@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Room — Doordarshan</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+      body {
+        overflow: hidden;
+      }
+
+      /* Prevent FOUC on controls — set initial icon state */
+      .ctrl-icon {
+        font-size: 1.25rem;
+        line-height: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="room-page">
+      <header class="room-topbar">
+        <div class="room-topbar-left">
+          <a
+            href="dashboard.html"
+            class="brand"
+            style="font-size: 0.9rem; gap: 0.4rem"
+          >
+            <div
+              class="brand-icon"
+              style="width: 22px; height: 22px; font-size: 0.7rem"
+            >
+              📡
+            </div>
+            DD
+          </a>
+
+          <div>
+            <div class="room-name" id="room-name">Loading…</div>
+            <div
+              class="topbar-code"
+              id="topbar-code"
+              title="Click to copy room code"
+            >
+              <span class="code-text" style="font-size: 0.75rem">—</span>
+              <span style="font-size: 0.7rem; color: var(--text-faint)">⧉</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="room-topbar-right">
+          <div class="ws-status connecting" id="ws-status">
+            <div class="ws-dot"></div>
+            <span id="ws-status-text">Connecting…</span>
+          </div>
+
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 0.35rem;
+              font-size: 0.8125rem;
+              color: var(--text-muted);
+              margin-left: 0.5rem;
+            "
+          >
+            👤 <span id="participant-count">0</span>
+          </div>
+        </div>
+      </header>
+
+      <div class="room-body">
+        <div class="video-area">
+          <div class="video-grid count-1" id="video-grid"></div>
+
+          <div class="controls-bar">
+            <button class="ctrl-btn" id="ctrl-mute" title="Mute/Unmute">
+              <span class="ctrl-icon">🎤</span>
+              <span class="ctrl-label">Mute</span>
+            </button>
+
+            <button class="ctrl-btn" id="ctrl-camera" title="Camera on/off">
+              <span class="ctrl-icon">📹</span>
+              <span class="ctrl-label">Camera</span>
+            </button>
+
+            <button
+              class="ctrl-btn"
+              id="ctrl-share"
+              title="Share screen (requires WebRTC)"
+              onclick="
+                window.DoordarshRoom &&
+                  window.DoordarshRoom.showToast(
+                    'Screen sharing requires WebRTC — coming soon!',
+                    'info',
+                  )
+              "
+            >
+              <span class="ctrl-icon">🖥</span>
+              <span class="ctrl-label">Share</span>
+            </button>
+
+            <button class="ctrl-btn active" id="ctrl-chat" title="Toggle chat">
+              <span class="ctrl-icon">💬</span>
+              <span class="ctrl-label">Chat</span>
+            </button>
+
+            <button
+              class="ctrl-btn ctrl-btn-leave"
+              id="ctrl-leave"
+              title="Leave room"
+            >
+              <span class="ctrl-icon">📴</span>
+              <span class="ctrl-label">Leave</span>
+            </button>
+          </div>
+        </div>
+
+        <aside class="room-sidebar" id="room-sidebar">
+          <div class="sidebar-tabs">
+            <button class="sidebar-tab active" data-tab="participants">
+              People
+            </button>
+            <button class="sidebar-tab" data-tab="chat">Chat</button>
+          </div>
+
+          <div class="sidebar-panel" data-panel="participants">
+            <div class="participants-list" id="participants-list"></div>
+          </div>
+
+          <div class="sidebar-panel hidden" data-panel="chat">
+            <div class="chat-messages" id="chat-messages">
+              <div class="chat-system-msg">
+                Messages are end-to-end within this session.
+              </div>
+            </div>
+            <div class="chat-input-area">
+              <textarea
+                class="chat-textarea"
+                id="chat-textarea"
+                rows="1"
+                placeholder="Send a message… (Enter to send)"
+                maxlength="4096"
+              ></textarea>
+              <button
+                class="btn btn-primary btn-sm"
+                id="chat-send-btn"
+                aria-label="Send"
+              >
+                ↑
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/room.js"></script>
+  </body>
+</html>

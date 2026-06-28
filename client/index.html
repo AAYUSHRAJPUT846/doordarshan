@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In — Doordarshan</title>
+    <link rel="stylesheet" href="css/styles.css" />
+    <style>
+      /* Page-specific: subtle animated gradient ring around the card */
+      .auth-page::before {
+        content: "";
+        position: fixed;
+        top: -40%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 600px;
+        height: 600px;
+        background: radial-gradient(
+          circle,
+          rgba(33, 136, 255, 0.07) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="auth-page">
+      <div class="auth-card">
+        <div class="auth-logo">
+          <div class="auth-logo-icon">📡</div>
+          Doordarshan
+        </div>
+
+        <h2 style="margin-bottom: 0.25rem">Welcome back</h2>
+        <p
+          class="text-muted"
+          style="font-size: 0.875rem; margin-bottom: 1.5rem"
+        >
+          Sign in to join or host a call.
+        </p>
+
+        <div
+          id="login-error"
+          class="form-error"
+          style="
+            padding: 0.625rem 0.875rem;
+            background: rgba(248, 81, 73, 0.08);
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+          "
+        ></div>
+
+        <form class="auth-form" id="login-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="email">Email</label>
+            <input
+              class="form-input"
+              type="email"
+              id="email"
+              name="email"
+              placeholder="you@example.com"
+              autocomplete="email"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="password">Password</label>
+            <input
+              class="form-input"
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Your password"
+              autocomplete="current-password"
+              required
+            />
+          </div>
+
+          <div
+            class="flex items-center justify-between"
+            style="margin-top: 0.25rem"
+          >
+            <label
+              style="
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                font-size: 0.875rem;
+                cursor: pointer;
+              "
+            >
+              <input type="checkbox" id="remember-me" />
+              Remember me
+            </label>
+          </div>
+
+          <button
+            class="btn btn-primary btn-lg w-full"
+            type="submit"
+            id="login-btn"
+            style="margin-top: 0.5rem"
+          >
+            Sign In
+          </button>
+        </form>
+
+        <p class="auth-divider">
+          No account? <a href="register.html">Create one</a>
+        </p>
+      </div>
+    </main>
+
+    <div id="toast-container"></div>
+
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+      "use strict";
+      const authUtils = window.DoordarshAuth;
+      const api = window.DoordarshApi;
+
+      // Redirect if already authenticated
+      authUtils.redirectIfAuthed();
+
+      const form = document.getElementById("login-form");
+      const emailEl = document.getElementById("email");
+      const passEl = document.getElementById("password");
+      const rememberEl = document.getElementById("remember-me");
+      const errorEl = document.getElementById("login-error");
+      const loginBtn = document.getElementById("login-btn");
+
+      function showError(msg) {
+        errorEl.textContent = msg;
+        errorEl.classList.add("visible");
+      }
+      function clearError() {
+        errorEl.classList.remove("visible");
+      }
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearError();
+
+        const email = emailEl.value.trim();
+        const password = passEl.value;
+
+        if (!email || !password) {
+          showError("Email and password are required.");
+          return;
+        }
+
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<span class="spinner"></span> Signing in…';
+
+        try {
+          const { access_token } = await api.login({ email, password });
+          authUtils.saveToken(access_token, rememberEl.checked);
+
+          // Decode user id from token payload (sub field) and persist
+          const payload = JSON.parse(
+            atob(
+              access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"),
+            ),
+          );
+          // We store a minimal user object; we'll enrich it later if needed
+          authUtils.saveUser({
+            id: Number(payload.sub),
+            username: email.split("@")[0],
+            email,
+          });
+
+          window.location.href = "dashboard.html";
+        } catch (err) {
+          showError(err.message || "Invalid email or password.");
+          loginBtn.disabled = false;
+          loginBtn.textContent = "Sign In";
+        }
+      });
+    </script>
+  </body>
+</html>
