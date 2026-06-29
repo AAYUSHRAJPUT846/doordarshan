@@ -13,7 +13,7 @@ app = FastAPI(
     title="Doordarshan",
 )
 
-CLIENT_DIR = Path(__file__).resolve().parent.parent.parent / "client"
+CLIENT_DIR = Path(__file__).resolve().parent.parent / "client"
 
 # Serve static files
 app.mount("/client", StaticFiles(directory=CLIENT_DIR), name="client")
