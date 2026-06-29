@@ -925,7 +925,7 @@ h4 {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  display: block;
+  display: none;
 }
 
 .video-tile .tile-avatar {
@@ -1313,5 +1313,101 @@ h4 {
   }
   h1 {
     font-size: 1.5rem;
+  }
+}
+
+.media-perm-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.625rem 1rem;
+  background: rgba(210, 153, 34, 0.1);
+  border-bottom: 1px solid rgba(210, 153, 34, 0.3);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.perm-banner-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.perm-banner-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.perm-banner-body strong {
+  font-size: 0.875rem;
+  color: var(--warning);
+}
+
+.perm-msg {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.tile-conn-state {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--warning);
+  background: rgba(210, 153, 34, 0.15);
+  border-radius: 4px;
+  padding: 0.15rem 0.4rem;
+}
+
+.chat-unread-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 16px;
+  height: 16px;
+  background: var(--danger);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+
+.ctrl-btn {
+  position: relative;
+}
+
+.ctrl-btn.active[id="ctrl-share"] {
+  background: rgba(63, 185, 80, 0.15);
+  border-color: rgba(63, 185, 80, 0.4);
+  color: var(--success);
+}
+
+.video-tile.screen-share-tile {
+  border-color: var(--success);
+}
+
+.screen-share-badge {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  background: rgba(63, 185, 80, 0.85);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(4px);
+}
+
+@media (max-width: 768px) {
+  .media-perm-banner {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

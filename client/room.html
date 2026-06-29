@@ -9,8 +9,6 @@
       body {
         overflow: hidden;
       }
-
-      /* Prevent FOUC on controls — set initial icon state */
       .ctrl-icon {
         font-size: 1.25rem;
         line-height: 1;
@@ -69,6 +67,16 @@
         </div>
       </header>
 
+      <div id="media-perm-banner" class="media-perm-banner" style="display:none;">
+        <div class="perm-banner-icon">🎥</div>
+        <div class="perm-banner-body">
+          <strong>Camera &amp; microphone blocked</strong>
+          <span class="perm-msg">Allow access in your browser to join with video and audio.</span>
+        </div>
+        <button class="btn btn-primary btn-sm" id="perm-retry-btn">Try again</button>
+        <button class="btn btn-secondary btn-sm" id="perm-dismiss-btn" onclick="this.closest('.media-perm-banner').style.display='none'">Dismiss</button>
+      </div>
+
       <div class="room-body">
         <div class="video-area">
           <div class="video-grid count-1" id="video-grid"></div>
@@ -87,14 +95,7 @@
             <button
               class="ctrl-btn"
               id="ctrl-share"
-              title="Share screen (requires WebRTC)"
-              onclick="
-                window.DoordarshRoom &&
-                  window.DoordarshRoom.showToast(
-                    'Screen sharing requires WebRTC — coming soon!',
-                    'info',
-                  )
-              "
+              title="Share your screen"
             >
               <span class="ctrl-icon">🖥</span>
               <span class="ctrl-label">Share</span>
@@ -103,6 +104,7 @@
             <button class="ctrl-btn active" id="ctrl-chat" title="Toggle chat">
               <span class="ctrl-icon">💬</span>
               <span class="ctrl-label">Chat</span>
+              <span id="chat-unread-badge" class="chat-unread-badge" style="display:none;"></span>
             </button>
 
             <button
@@ -159,6 +161,9 @@
 
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/websocket.js"></script>
+    <script src="js/media.js"></script>
+    <script src="js/webrtc.js"></script>
     <script src="js/room.js"></script>
   </body>
 </html>

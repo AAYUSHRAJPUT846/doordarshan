@@ -8,52 +8,31 @@ auth.requireAuth();
 const params = new URLSearchParams(window.location.search);
 const ROOM_CODE = params.get("room");
 
-if (!ROOM_CODE) {
-  window.location.href = "dashboard.html";
-}
+if (!ROOM_CODE) window.location.href = "dashboard.html";
 
 const videoGrid = document.getElementById("video-grid");
 const participantsList = document.getElementById("participants-list");
 const chatMessages = document.getElementById("chat-messages");
 const chatTextarea = document.getElementById("chat-textarea");
 const chatSendBtn = document.getElementById("chat-send-btn");
-const wsStatus = document.getElementById("ws-status");
-const wsStatusText = document.getElementById("ws-status-text");
+const wsStatusEl = document.getElementById("ws-status");
+const wsStatusTextEl = document.getElementById("ws-status-text");
 const roomNameEl = document.getElementById("room-name");
 const topbarCodeEl = document.getElementById("topbar-code");
-const participantCount = document.getElementById("participant-count");
+const participantCountEl = document.getElementById("participant-count");
+const mediaPermBanner = document.getElementById("media-perm-banner");
+const permRetryBtn = document.getElementById("perm-retry-btn");
 
 const btnMute = document.getElementById("ctrl-mute");
 const btnCamera = document.getElementById("ctrl-camera");
+const btnShare = document.getElementById("ctrl-share");
 const btnChat = document.getElementById("ctrl-chat");
 const btnLeave = document.getElementById("ctrl-leave");
 
-const self = auth.getUser();
-
-let ws = null;
-let reconnectTimer = null;
-let reconnectAttempts = 0;
-const MAX_RECONNECTS = 5;
+const selfUser = auth.getUser();
 
 const participants = new Map();
-
-let isMuted = false;
-let isCamOff = false;
 let isChatOpen = true;
-
-const MSG = {
-  PING: "ping",
-  PONG: "pong",
-  LEAVE: "leave",
-  OFFER: "offer",
-  ANSWER: "answer",
-  ICE_CANDIDATE: "ice_candidate",
-  DIRECT_MESSAGE: "direct_message",
-  PARTICIPANT_JOINED: "participant_joined",
-  PARTICIPANT_LEFT: "participant_left",
-  PARTICIPANT_LIST: "participant_list",
-  ERROR: "error",
-};
 
 const toastContainer = document.getElementById("toast-container");
 
@@ -61,215 +40,283 @@ function showToast(message, type = "info", duration = 3500) {
   const icons = { success: "✓", error: "✕", info: "ℹ" };
   const el = document.createElement("div");
   el.className = `toast toast-${type}`;
-  el.innerHTML = `<span class="toast-icon">${icons[type]}</span><span>${message}</span>`;
+  el.innerHTML = `<span class="toast-icon">${icons[type] ?? "ℹ"}</span><span>${message}</span>`;
   toastContainer.appendChild(el);
-  setTimeout(() => {
-    el.classList.add("leaving");
-    el.addEventListener("animationend", () => el.remove(), { once: true });
-  }, duration);
+  if (duration > 0) {
+    setTimeout(() => {
+      el.classList.add("leaving");
+      el.addEventListener("animationend", () => el.remove(), { once: true });
+    }, duration);
+  }
+  return el;
 }
 
-async function initRoomInfo() {
-  try {
-    const room = await api.getRoom(ROOM_CODE);
-    if (roomNameEl) roomNameEl.textContent = room.title;
-    document.title = `${room.title} — Doordarshan`;
-  } catch {
-    if (roomNameEl) roomNameEl.textContent = ROOM_CODE;
-  }
-
-  if (topbarCodeEl) {
-    topbarCodeEl.querySelector(".code-text").textContent = ROOM_CODE;
-    topbarCodeEl.addEventListener("click", async () => {
-      await navigator.clipboard.writeText(ROOM_CODE).catch(() => {});
-      showToast("Room code copied!", "success", 1800);
-    });
-  }
+function _esc(str = "") {
+  return String(str).replace(
+    /[&<>"']/g,
+    (c) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      })[c]
+  );
 }
+
+const media = new window.DoordarshMedia();
+const wsManager = new window.DoordarshWS();
+const rtc = new window.DoordarshRTC((payload) => wsManager.send(payload));
+
+media.on("stream", (stream) => {
+  rtc.setLocalStream(stream);
+  hidePremBanner();
+  attachLocalStream(stream);
+});
+
+media.on("error", (err) => {
+  console.warn("[Media] Error:", err.name, err.message);
+  if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+    showPermBanner("Camera and microphone access was denied.");
+  } else if (err.name === "NotFoundError") {
+    showPermBanner("No camera or microphone found. Joining audio-only.");
+    media.startAudioOnly().catch(() => {});
+  } else {
+    showToast("Could not access media: " + err.message, "error", 5000);
+  }
+});
+
+media.on("micToggle", (muted) => {
+  btnMute.classList.toggle("muted", muted);
+  btnMute.querySelector(".ctrl-icon").textContent = muted ? "🔇" : "🎤";
+  btnMute.querySelector(".ctrl-label").textContent = muted ? "Unmute" : "Mute";
+  const selfTile = videoGrid.querySelector(`[data-uid="${selfUser.id}"]`);
+  if (selfTile) {
+    const existing = selfTile.querySelector(".tile-mute-icon");
+    if (muted && !existing) {
+      const icon = document.createElement("div");
+      icon.className = "tile-mute-icon";
+      icon.textContent = "🔇";
+      selfTile.querySelector(".tile-label")?.appendChild(icon);
+    } else if (!muted && existing) {
+      existing.remove();
+    }
+  }
+});
+
+media.on("cameraToggle", (off) => {
+  updateCameraUI(off);
+  const selfTile = videoGrid.querySelector(`[data-uid="${selfUser.id}"]`);
+  if (selfTile) {
+    const avatar = selfTile.querySelector(".tile-avatar");
+    const video = selfTile.querySelector("video");
+    if (avatar) avatar.style.display = off ? "flex" : "none";
+    if (video) video.style.display = off ? "none" : "block";
+  }
+});
+
+media.on("screenShare", (screenTrack) => {
+  rtc.replaceVideoTrack(screenTrack);
+  updateScreenShareUI(true);
+  const selfTile = videoGrid.querySelector(`[data-uid="${selfUser.id}"]`);
+  if (selfTile) {
+    const video = selfTile.querySelector("video");
+    if (video && media.getStream()) {
+      const dummyStream = new MediaStream([screenTrack]);
+      video.srcObject = dummyStream;
+      video.play().catch(() => {});
+      const avatar = selfTile.querySelector(".tile-avatar");
+      if (avatar) avatar.style.display = "none";
+      video.style.display = "block";
+    }
+  }
+});
+
+media.on("screenShareStop", (camTrack) => {
+  if (camTrack) rtc.replaceVideoTrack(camTrack);
+  updateScreenShareUI(false);
+  const selfTile = videoGrid.querySelector(`[data-uid="${selfUser.id}"]`);
+  if (selfTile) {
+    const video = selfTile.querySelector("video");
+    if (video && media.getStream()) {
+      video.srcObject = media.getStream();
+      video.play().catch(() => {});
+    }
+    const off = media.isCamOff();
+    const avatar = selfTile.querySelector(".tile-avatar");
+    if (avatar) avatar.style.display = off ? "flex" : "none";
+    if (video) video.style.display = off ? "none" : "block";
+  }
+});
+
+media.on("videoTrackChanged", (track) => {
+  rtc.replaceVideoTrack(track);
+  const selfTile = videoGrid.querySelector(`[data-uid="${selfUser.id}"]`);
+  if (selfTile) {
+    const video = selfTile.querySelector("video");
+    if (video && media.getStream()) {
+      video.srcObject = media.getStream();
+    }
+  }
+});
+
+media.on("audioTrackChanged", (track) => {
+  rtc.replaceAudioTrack(track);
+});
+
+wsManager.on("status", setWsStatus);
+wsManager.on("open", onWsOpen);
+wsManager.on("close", () => {});
+wsManager.on("error", () => console.warn("[WS] connection error"));
+wsManager.on("reconnecting", ({ delay }) => {
+  showToast(`Connection lost — reconnecting in ${delay / 1000}s…`, "info");
+});
+wsManager.on("reconnect_failed", () => {
+  showToast("Could not reconnect. Refresh the page to retry.", "error", 0);
+});
+wsManager.on("auth_error", () => {
+  showToast("Session expired. Please sign in again.", "error");
+  auth.logout();
+});
+
+wsManager.on("msg:ping", () => wsManager.send({ type: "pong" }));
+wsManager.on("msg:participant_list", handleParticipantList);
+wsManager.on("msg:participant_joined", handleParticipantJoined);
+wsManager.on("msg:participant_left", handleParticipantLeft);
+wsManager.on("msg:offer", (msg) => rtc.handleOffer(msg.from_user_id, msg.sdp));
+wsManager.on("msg:answer", (msg) => rtc.handleAnswer(msg.from_user_id, msg.sdp));
+wsManager.on("msg:ice_candidate", (msg) =>
+  rtc.handleIceCandidate(msg.from_user_id, msg.candidate)
+);
+wsManager.on("msg:direct_message", handleIncomingDm);
+wsManager.on("msg:error", (msg) =>
+  showToast(`Server: ${msg.message}`, "error")
+);
+
+rtc.on("remoteStream", (userId, stream) => {
+  attachStream(userId, stream);
+});
+
+rtc.on("peerState", (userId, state) => {
+  const tile = videoGrid.querySelector(`[data-uid="${userId}"]`);
+  if (!tile) return;
+  const indicator = tile.querySelector(".tile-conn-state");
+  if (state === "connected" || state === "completed") {
+    if (indicator) indicator.remove();
+  } else if (state === "connecting" || state === "checking") {
+    if (!indicator) {
+      const el = document.createElement("div");
+      el.className = "tile-conn-state";
+      el.textContent = "Connecting…";
+      tile.querySelector(".tile-label")?.prepend(el);
+    }
+  } else if (state === "failed" || state === "disconnected") {
+    if (indicator) indicator.textContent = "Reconnecting…";
+  }
+});
 
 function setWsStatus(state) {
-  wsStatus.className = `ws-status ${state}`;
+  wsStatusEl.className = `ws-status ${state}`;
   const labels = {
     connecting: "Connecting…",
     connected: "Live",
     disconnected: "Disconnected",
   };
-  if (wsStatusText) wsStatusText.textContent = labels[state] ?? state;
-}
-
-function connectWs() {
-  if (
-    ws &&
-    (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)
-  )
-    return;
-
-  setWsStatus("connecting");
-  const url = api.buildWsUrl(ROOM_CODE);
-  ws = new WebSocket(url);
-
-  ws.addEventListener("open", onWsOpen);
-  ws.addEventListener("message", onWsMessage);
-  ws.addEventListener("close", onWsClose);
-  ws.addEventListener("error", onWsError);
+  if (wsStatusTextEl) wsStatusTextEl.textContent = labels[state] ?? state;
 }
 
 function onWsOpen() {
-  reconnectAttempts = 0;
-  setWsStatus("connected");
   showToast("Connected to room", "success", 2000);
-  addParticipant({ user_id: self.id, username: self.username }, true);
+  addSelfTile();
 }
 
-function onWsClose(e) {
-  setWsStatus("disconnected");
+function addSelfTile() {
+  if (videoGrid.querySelector(`[data-uid="${selfUser.id}"]`)) return;
+  const initials = auth.getInitials(selfUser.username);
+  const color = auth.avatarColor(String(selfUser.id));
+  const tile = document.createElement("div");
+  tile.className = "video-tile self-tile";
+  tile.dataset.uid = selfUser.id;
+  tile.innerHTML = `
+    <video autoplay playsinline muted></video>
+    <div class="tile-avatar">
+      <div class="avatar-circle" style="background:${color};">${initials}</div>
+      <span class="tile-username">${_esc(selfUser.username)} (You)</span>
+    </div>
+    <div class="tile-label">
+      <span class="tile-name-pill">${_esc(selfUser.username)} · You</span>
+    </div>
+  `;
+  videoGrid.appendChild(tile);
+  participants.set(selfUser.id, { user_id: selfUser.id, username: selfUser.username });
+  updateGridClass();
+  updateParticipantCount();
 
-  if (e.code === 1000) return;
-
-  if (e.code === 1008) {
-    showToast("Session expired. Please log in again.", "error");
-    auth.logout();
-    return;
-  }
-
-  if (reconnectAttempts < MAX_RECONNECTS) {
-    const delay = Math.min(1000 * 2 ** reconnectAttempts, 15000);
-    reconnectAttempts++;
-    showToast(`Connection lost. Reconnecting in ${delay / 1000}s…`, "info");
-    reconnectTimer = setTimeout(connectWs, delay);
-  } else {
-    showToast("Could not reconnect. Please refresh the page.", "error", 0);
-  }
+  const stream = media.getStream();
+  if (stream) attachLocalStream(stream);
 }
 
-function onWsError() {
-  console.warn("[Doordarshan] WebSocket error");
-}
-
-function onWsMessage(event) {
-  let msg;
-  try {
-    msg = JSON.parse(event.data);
-  } catch {
-    console.warn("[WS] Non-JSON frame:", event.data);
-    return;
-  }
-
-  switch (msg.type) {
-    case MSG.PING:
-      wsSend({ type: MSG.PONG });
-      break;
-
-    case MSG.PARTICIPANT_LIST:
-      handleParticipantList(msg.participants);
-      break;
-
-    case MSG.PARTICIPANT_JOINED:
-      handleParticipantJoined(msg);
-      break;
-
-    case MSG.PARTICIPANT_LEFT:
-      handleParticipantLeft(msg);
-      break;
-
-    case MSG.OFFER:
-      console.log("[WebRTC stub] Received offer from", msg.from_user_id);
-      handleIncomingOffer(msg);
-      break;
-
-    case MSG.ANSWER:
-      console.log("[WebRTC stub] Received answer from", msg.from_user_id);
-      handleIncomingAnswer(msg);
-      break;
-
-    case MSG.ICE_CANDIDATE:
-      console.log(
-        "[WebRTC stub] Received ICE candidate from",
-        msg.from_user_id,
-      );
-      handleIncomingIce(msg);
-      break;
-
-    case MSG.DIRECT_MESSAGE:
-      handleIncomingDm(msg);
-      break;
-
-    case MSG.ERROR:
-      showToast(`Server error: ${msg.message}`, "error");
-      console.error("[WS error]", msg);
-      break;
-
-    default:
-      console.warn("[WS] Unknown message type:", msg.type);
-  }
-}
-
-function wsSend(payload) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
-    console.warn("[WS] Cannot send — socket not open:", payload);
-    return false;
-  }
-  ws.send(JSON.stringify(payload));
-  return true;
-}
-
-function handleParticipantList(list) {
-  for (const [uid] of participants) {
-    if (uid !== self.id) removeParticipant(uid);
-  }
-  for (const p of list) {
-    if (p.user_id !== self.id) addParticipant(p, false);
-  }
-}
-
-function handleParticipantJoined(msg) {
-  if (msg.user_id === self.id) return;
-  addParticipant({ user_id: msg.user_id, username: msg.username }, false);
-  addSystemMsg(`${msg.username} joined`);
-  showToast(`${msg.username} joined the room`, "info", 2500);
-}
-
-function handleParticipantLeft(msg) {
-  removeParticipant(msg.user_id);
-  addSystemMsg(`${msg.username} left`);
-  showToast(`${msg.username} left`, "info", 2000);
-}
-
-function createPeerConnection(remoteUserId) {
-  console.log(
-    "[WebRTC stub] createPeerConnection called for user",
-    remoteUserId,
-  );
-}
-
-function sendOffer(targetUserId, sdp) {
-  wsSend({ type: MSG.OFFER, target_user_id: targetUserId, sdp });
-}
-
-function handleIncomingOffer(msg) {}
-
-function sendAnswer(targetUserId, sdp) {
-  wsSend({ type: MSG.ANSWER, target_user_id: targetUserId, sdp });
-}
-
-function handleIncomingAnswer(msg) {}
-
-function sendIceCandidate(targetUserId, candidate) {
-  wsSend({ type: MSG.ICE_CANDIDATE, target_user_id: targetUserId, candidate });
-}
-
-function handleIncomingIce(msg) {}
-
-function attachStream(userId, stream) {
-  const tile = document.querySelector(`[data-uid="${userId}"]`);
+function attachLocalStream(stream) {
+  const tile = videoGrid.querySelector(`[data-uid="${selfUser.id}"]`);
   if (!tile) return;
   const video = tile.querySelector("video");
   const avatar = tile.querySelector(".tile-avatar");
   if (video) {
     video.srcObject = stream;
+    video.muted = true;
     video.play().catch(() => {});
-    if (avatar) avatar.style.display = "none";
   }
+  const hasVideo = stream.getVideoTracks().length > 0 && !media.isCamOff();
+  if (avatar) avatar.style.display = hasVideo ? "none" : "flex";
+  if (video) video.style.display = hasVideo ? "block" : "none";
+
+  addSelfToParticipantList();
+}
+
+function addSelfToParticipantList() {
+  if (participantsList.querySelector(`[data-uid="${selfUser.id}"]`)) return;
+  const initials = auth.getInitials(selfUser.username);
+  const color = auth.avatarColor(String(selfUser.id));
+  const item = document.createElement("div");
+  item.className = "participant-item";
+  item.dataset.uid = selfUser.id;
+  item.innerHTML = `
+    <div class="avatar-circle sm" style="background:${color};">${initials}</div>
+    <span class="participant-name">${_esc(selfUser.username)}</span>
+    <span class="participant-badge">You</span>
+  `;
+  participantsList.appendChild(item);
+}
+
+function handleParticipantList(msg) {
+  for (const [uid] of participants) {
+    if (uid !== selfUser.id) {
+      removeParticipant(uid);
+      rtc.closePeer(uid);
+    }
+  }
+  for (const p of msg.participants) {
+    if (p.user_id !== selfUser.id) {
+      addParticipant(p, false);
+      rtc.initiateCall(p.user_id);
+    }
+  }
+}
+
+function handleParticipantJoined(msg) {
+  if (msg.user_id === selfUser.id) return;
+  addParticipant({ user_id: msg.user_id, username: msg.username }, false);
+  addSystemMsg(`${msg.username} joined`);
+  showToast(`${msg.username} joined the room`, "info", 2500);
+  rtc.initiateCall(msg.user_id);
+}
+
+function handleParticipantLeft(msg) {
+  rtc.closePeer(msg.user_id);
+  removeParticipant(msg.user_id);
+  addSystemMsg(`${msg.username} left`);
+  showToast(`${msg.username} left`, "info", 2000);
 }
 
 function addParticipant(p, isSelf) {
@@ -283,7 +330,7 @@ function addParticipant(p, isSelf) {
   tile.className = `video-tile${isSelf ? " self-tile" : ""}`;
   tile.dataset.uid = p.user_id;
   tile.innerHTML = `
-    <video autoplay playsinline muted="${isSelf}"></video>
+    <video autoplay playsinline></video>
     <div class="tile-avatar">
       <div class="avatar-circle" style="background:${color};">${initials}</div>
       <span class="tile-username">${_esc(p.username)}${isSelf ? " (You)" : ""}</span>
@@ -310,12 +357,42 @@ function addParticipant(p, isSelf) {
 
 function removeParticipant(userId) {
   participants.delete(userId);
-
   videoGrid.querySelector(`[data-uid="${userId}"]`)?.remove();
   participantsList.querySelector(`[data-uid="${userId}"]`)?.remove();
-
   updateGridClass();
   updateParticipantCount();
+}
+
+function attachStream(userId, stream) {
+  const tile = videoGrid.querySelector(`[data-uid="${userId}"]`);
+  if (!tile) return;
+  const video = tile.querySelector("video");
+  const avatar = tile.querySelector(".tile-avatar");
+  if (video) {
+    video.srcObject = stream;
+    video.play().catch(() => {});
+    stream.addEventListener("active", () => {
+      if (avatar && stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")) {
+        avatar.style.display = "none";
+        video.style.display = "block";
+      }
+    });
+    const checkVideo = () => {
+      const hasLiveVideo = stream
+        .getVideoTracks()
+        .some((t) => t.enabled && t.readyState === "live");
+      if (avatar) avatar.style.display = hasLiveVideo ? "none" : "flex";
+      if (video) video.style.display = hasLiveVideo ? "block" : "none";
+    };
+    stream.getVideoTracks().forEach((t) => {
+      t.addEventListener("ended", checkVideo);
+      t.addEventListener("mute", checkVideo);
+      t.addEventListener("unmute", checkVideo);
+    });
+    stream.addEventListener("addtrack", checkVideo);
+    stream.addEventListener("removetrack", checkVideo);
+    checkVideo();
+  }
 }
 
 function updateGridClass() {
@@ -324,13 +401,21 @@ function updateGridClass() {
 }
 
 function updateParticipantCount() {
-  if (participantCount) participantCount.textContent = participants.size;
+  if (participantCountEl) participantCountEl.textContent = participants.size;
 }
 
 function handleIncomingDm(msg) {
   const sender = participants.get(msg.from_user_id);
   const name = sender?.username ?? `User ${msg.from_user_id}`;
-  appendChatMsg(name, msg.content, msg.from_user_id === self.id);
+  appendChatMsg(name, msg.content, msg.from_user_id === selfUser.id);
+
+  if (!isChatOpen) {
+    const badge = document.getElementById("chat-unread-badge");
+    if (badge) {
+      badge.textContent = (parseInt(badge.textContent || "0", 10) + 1).toString();
+      badge.style.display = "inline";
+    }
+  }
 }
 
 function appendChatMsg(name, content, isSelf) {
@@ -361,19 +446,16 @@ function addSystemMsg(text) {
 
 function sendChatMessage(content) {
   if (!content.trim()) return;
-
-  appendChatMsg(self.username, content, true);
+  appendChatMsg(selfUser.username, content, true);
 
   let sent = 0;
   for (const [uid] of participants) {
-    if (uid === self.id) continue;
-    wsSend({ type: MSG.DIRECT_MESSAGE, target_user_id: uid, content });
+    if (uid === selfUser.id) continue;
+    wsManager.send({ type: "direct_message", target_user_id: uid, content });
     sent++;
   }
 
-  if (sent === 0) {
-    addSystemMsg("No one else is in the room yet.");
-  }
+  if (sent === 0) addSystemMsg("No one else is in the room yet.");
 }
 
 chatSendBtn?.addEventListener("click", () => {
@@ -397,39 +479,21 @@ chatTextarea?.addEventListener("input", () => {
 });
 
 btnMute?.addEventListener("click", () => {
-  isMuted = !isMuted;
-  btnMute.classList.toggle("muted", isMuted);
-  btnMute.querySelector(".ctrl-icon").textContent = isMuted ? "🔇" : "🎤";
-  btnMute.querySelector(".ctrl-label").textContent = isMuted
-    ? "Unmute"
-    : "Mute";
-
-  const selfTile = videoGrid.querySelector(`[data-uid="${self.id}"]`);
-  if (selfTile) {
-    const existingIcon = selfTile.querySelector(".tile-mute-icon");
-    if (isMuted && !existingIcon) {
-      const icon = document.createElement("div");
-      icon.className = "tile-mute-icon";
-      icon.textContent = "🔇";
-      selfTile.querySelector(".tile-label").appendChild(icon);
-    } else if (!isMuted && existingIcon) {
-      existingIcon.remove();
-    }
-  }
+  media.toggleMic();
 });
 
 btnCamera?.addEventListener("click", () => {
-  isCamOff = !isCamOff;
-  btnCamera.classList.toggle("muted", isCamOff);
-  btnCamera.querySelector(".ctrl-icon").textContent = isCamOff ? "📷" : "📹";
-  btnCamera.querySelector(".ctrl-label").textContent = isCamOff
-    ? "Show cam"
-    : "Camera";
+  media.toggleCamera();
+});
 
-  const selfTile = videoGrid.querySelector(`[data-uid="${self.id}"]`);
-  if (selfTile) {
-    const avatar = selfTile.querySelector(".tile-avatar");
-    if (avatar) avatar.style.display = isCamOff ? "flex" : "none";
+btnShare?.addEventListener("click", async () => {
+  if (media.isScreenSharing()) {
+    media.stopScreenShare();
+  } else {
+    btnShare.disabled = true;
+    const track = await media.startScreenShare();
+    btnShare.disabled = false;
+    if (!track) showToast("Screen sharing cancelled.", "info", 2000);
   }
 });
 
@@ -438,32 +502,35 @@ btnChat?.addEventListener("click", () => {
   const sidebar = document.getElementById("room-sidebar");
   sidebar?.classList.toggle("collapsed", !isChatOpen);
   btnChat.classList.toggle("active", isChatOpen);
+
+  if (isChatOpen) {
+    const badge = document.getElementById("chat-unread-badge");
+    if (badge) {
+      badge.textContent = "";
+      badge.style.display = "none";
+    }
+  }
 });
 
 btnLeave?.addEventListener("click", leaveRoom);
 
 async function leaveRoom() {
-  clearTimeout(reconnectTimer);
-
-  wsSend({ type: MSG.LEAVE });
-
-  if (ws) {
-    ws.onclose = null;
-    ws.close(1000, "User left");
-  }
+  rtc.closeAll();
+  media.stop();
+  wsManager.disconnect(1000, "User left");
 
   try {
     await api.leaveRoom(ROOM_CODE);
-  } catch (err) {
-    console.error(err);
-  }
+  } catch {}
 
   window.location.href = "dashboard.html";
 }
 
 window.addEventListener("beforeunload", () => {
-  wsSend({ type: MSG.LEAVE });
-  ws?.close(1000, "Page unload");
+  wsManager.send({ type: "leave" });
+  wsManager.disconnect(1000, "Page unload");
+  media.stop();
+  rtc.closeAll();
 });
 
 document.querySelectorAll(".sidebar-tab").forEach((tab) => {
@@ -480,24 +547,60 @@ document.querySelectorAll(".sidebar-tab").forEach((tab) => {
   });
 });
 
-function _esc(str = "") {
-  return String(str).replace(
-    /[&<>"']/g,
-    (c) =>
-      ({
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      })[c],
-  );
+function updateCameraUI(off) {
+  btnCamera.classList.toggle("muted", off);
+  btnCamera.querySelector(".ctrl-icon").textContent = off ? "📷" : "📹";
+  btnCamera.querySelector(".ctrl-label").textContent = off ? "Show cam" : "Camera";
 }
+
+function updateScreenShareUI(sharing) {
+  btnShare.classList.toggle("active", sharing);
+  btnShare.querySelector(".ctrl-icon").textContent = sharing ? "🖥️" : "🖥";
+  btnShare.querySelector(".ctrl-label").textContent = sharing ? "Stop share" : "Share";
+}
+
+function showPermBanner(msg) {
+  if (!mediaPermBanner) return;
+  const msgEl = mediaPermBanner.querySelector(".perm-msg");
+  if (msgEl) msgEl.textContent = msg;
+  mediaPermBanner.style.display = "flex";
+}
+
+function hidePremBanner() {
+  if (mediaPermBanner) mediaPermBanner.style.display = "none";
+}
+
+permRetryBtn?.addEventListener("click", async () => {
+  hidePremBanner();
+  await media.start().catch(() => {});
+});
+
+async function initRoomInfo() {
+  try {
+    const room = await api.getRoom(ROOM_CODE);
+    if (roomNameEl) roomNameEl.textContent = room.title;
+    document.title = `${room.title} — Doordarshan`;
+  } catch {
+    if (roomNameEl) roomNameEl.textContent = ROOM_CODE;
+  }
+
+  if (topbarCodeEl) {
+    topbarCodeEl.querySelector(".code-text").textContent = ROOM_CODE;
+    topbarCodeEl.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(ROOM_CODE).catch(() => {});
+      showToast("Room code copied!", "success", 1800);
+    });
+  }
+}
+
+window.DoordarshRoom = { showToast };
 
 (async function init() {
   await initRoomInfo();
 
+  await media.start().catch(() => {});
+
   await api.joinRoom(ROOM_CODE);
 
-  connectWs();
+  wsManager.connect(api.buildWsUrl(ROOM_CODE));
 })();
