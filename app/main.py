@@ -15,8 +15,8 @@ app = FastAPI(
 
 CLIENT_DIR = Path(__file__).resolve().parent.parent / "client"
 
-# Serve static files
-app.mount("/client", StaticFiles(directory=CLIENT_DIR), name="client")
+app.mount("/css", StaticFiles(directory=CLIENT_DIR / "css"), name="css")
+app.mount("/js", StaticFiles(directory=CLIENT_DIR / "js"), name="js")
 
 app.add_middleware(
     CORSMiddleware,
@@ -26,7 +26,7 @@ app.add_middleware(
         "https://*.onrender.com",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"],    
     allow_headers=["*"],
 )
 
