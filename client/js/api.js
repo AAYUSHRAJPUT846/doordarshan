@@ -1,8 +1,10 @@
 "use strict";
 
-const API_BASE = window.location.origin;
-const WS_BASE =`${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
+const API_BASE = `${window.location.origin}/api/v1`;
 
+const WS_BASE =
+  `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
+  
 function _getToken() {
   return sessionStorage.getItem("dd_token") || localStorage.getItem("dd_token");
 }

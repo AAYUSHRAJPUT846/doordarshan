@@ -9,9 +9,7 @@ from app.api.v1.api import api_router
 from app.api.v1.endpoints.auth import router as auth_router
 from app.ws.endpoints import router as ws_router
 
-app = FastAPI(
-    title="Doordarshan",
-)
+app = FastAPI(title="Doordarshan")
 
 CLIENT_DIR = Path(__file__).resolve().parent.parent / "client"
 
@@ -26,7 +24,7 @@ app.add_middleware(
         "https://*.onrender.com",
     ],
     allow_credentials=True,
-    allow_methods=["*"],    
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -41,6 +39,10 @@ async def login():
 @app.get("/register")
 async def register():
     return FileResponse(CLIENT_DIR / "register.html")
+
+@app.get("/dashboard")
+async def dashboard():
+    return FileResponse(CLIENT_DIR / "dashboard.html")
 
 @app.get("/room")
 async def room():
