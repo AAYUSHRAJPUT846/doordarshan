@@ -26,12 +26,19 @@ class Settings(BaseSettings):
         alias="ACCESS_TOKEN_EXPIRE_MINUTES",
     )
 
+    metered_username: str = Field(
+        alias="METERED_USERNAME",
+    )
+
+    metered_credential: str = Field(
+        alias="METERED_CREDENTIAL",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
         populate_by_name=True,
     )
-
 
 settings = Settings()

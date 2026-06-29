@@ -596,6 +596,8 @@ async function initRoomInfo() {
 window.DoordarshRoom = { showToast };
 
 (async function init() {
+  await window.loadIceServers();
+
   await initRoomInfo();
 
   await media.start().catch(() => {});

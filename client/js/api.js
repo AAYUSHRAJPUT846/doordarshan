@@ -134,6 +134,12 @@ function buildWsUrl(roomCode) {
   return `${WS_BASE}/ws/rooms/${encodeURIComponent(roomCode)}?token=${encodeURIComponent(token)}`;
 }
 
+async function getIceConfig() {
+  return _fetch("/ice/config", {
+    headers: _headers(true),
+  });
+}
+
 window.DoordarshApi = {
   register,
   login,
@@ -150,6 +156,8 @@ window.DoordarshApi = {
   leaveRoom,
   listParticipants,
 
+  getIceConfig,
+  
   buildWsUrl,
   _getToken,
 };

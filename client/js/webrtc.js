@@ -1,22 +1,18 @@
 "use strict";
 
-const _ICE_SERVERS = [
-  {
-    urls: [
-      "stun:global.relay.metered.ca:80"
-    ]
-  },
-  {
-    urls: [
-      "turn:global.relay.metered.ca:80",
-      "turn:global.relay.metered.ca:80?transport=tcp",
-      "turn:global.relay.metered.ca:443",
-      "turns:global.relay.metered.ca:443?transport=tcp"
-    ],
-    username: "9d9440276d33dfb2b7d2c6b4",
-    credential: "dTSRVZEso4cvhhig"
+let _ICE_SERVERS = [];
+
+async function loadIceServers() {
+  const response = await fetch("/api/v1/ice/config");
+
+  if (!response.ok) {
+    throw new Error("Unable to fetch ICE configuration");
   }
-];
+
+  const data = await response.json();
+
+  _ICE_SERVERS = data.iceServers;
+}
 
 class WebRTCManager {
   constructor(sendFn) {
@@ -225,3 +221,4 @@ class WebRTCManager {
 }
 
 window.DoordarshRTC = WebRTCManager;
+window.loadIceServers = loadIceServers;
