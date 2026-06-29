@@ -30,7 +30,6 @@ An open-source video conferencing application built with FastAPI, WebRTC, WebSoc
 app/
 client/
 alembic/
-scripts/
 .env.example
 pyproject.toml
 Makefile
