@@ -1,7 +1,7 @@
 "use strict";
 
-const API_BASE = "http://127.0.0.1:8000/api/v1";
-const WS_BASE = "ws://127.0.0.1:8000";
+const API_BASE = window.location.origin;
+const WS_BASE =`${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
 
 function _getToken() {
   return sessionStorage.getItem("dd_token") || localStorage.getItem("dd_token");

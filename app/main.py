@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1.api import api_router
 from app.api.v1.endpoints.auth import router as auth_router
@@ -9,16 +13,38 @@ app = FastAPI(
     title="Doordarshan",
 )
 
+CLIENT_DIR = Path(__file__).resolve().parent.parent.parent / "client"
+
+# Serve static files
+app.mount("/client", StaticFiles(directory=CLIENT_DIR), name="client")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://127.0.0.1:5500",
         "http://localhost:5500",
+        "https://*.onrender.com",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+async def home():
+    return FileResponse(CLIENT_DIR / "index.html")
+
+@app.get("/login")
+async def login():
+    return FileResponse(CLIENT_DIR / "login.html")
+
+@app.get("/register")
+async def register():
+    return FileResponse(CLIENT_DIR / "register.html")
+
+@app.get("/room")
+async def room():
+    return FileResponse(CLIENT_DIR / "room.html")
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(api_router, prefix="/api/v1")
