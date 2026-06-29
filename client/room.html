@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Room — Doordarshan</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/style.css" />
     <style>
       body {
         overflow: hidden;
@@ -12,6 +12,87 @@
       .ctrl-icon {
         font-size: 1.25rem;
         line-height: 1;
+      }
+      video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        background: #000;
+        border-radius: inherit;
+        display: block;
+      }
+      .video-tile {
+        position: relative;
+        background: #111;
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .video-tile .tile-label {
+        position: absolute;
+        bottom: 8px;
+        left: 10px;
+        font-size: 0.75rem;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 2px 8px;
+        border-radius: 4px;
+        pointer-events: none;
+      }
+      .video-tile .tile-muted-icon {
+        position: absolute;
+        bottom: 8px;
+        right: 10px;
+        font-size: 0.85rem;
+        display: none;
+      }
+      .video-tile.muted .tile-muted-icon {
+        display: block;
+      }
+      .video-tile .tile-avatar {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        background: #1a1a2e;
+        display: none;
+      }
+      .video-tile.cam-off .tile-avatar {
+        display: flex;
+      }
+      .video-tile.cam-off video {
+        visibility: hidden;
+      }
+      .video-grid {
+        display: grid;
+        width: 100%;
+        height: 100%;
+        gap: 8px;
+        padding: 8px;
+        box-sizing: border-box;
+      }
+      .video-grid.count-1 {
+        grid-template-columns: 1fr;
+      }
+      .video-grid.count-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+      .video-grid.count-3 {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+      .video-grid.count-3 .video-tile:first-child {
+        grid-column: 1 / -1;
+      }
+      .video-grid.count-4 {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr 1fr;
+      }
+      .video-grid.count-5,
+      .video-grid.count-6 {
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: repeat(2, 1fr);
       }
     </style>
   </head>
@@ -32,7 +113,6 @@
             </div>
             DD
           </a>
-
           <div>
             <div class="room-name" id="room-name">Loading…</div>
             <div
@@ -51,7 +131,6 @@
             <div class="ws-dot"></div>
             <span id="ws-status-text">Connecting…</span>
           </div>
-
           <div
             style="
               display: flex;
@@ -67,14 +146,24 @@
         </div>
       </header>
 
-      <div id="media-perm-banner" class="media-perm-banner" style="display:none;">
+      <div
+        id="media-perm-banner"
+        class="media-perm-banner"
+        style="display: none"
+      >
         <div class="perm-banner-icon">🎥</div>
         <div class="perm-banner-body">
           <strong>Camera &amp; microphone blocked</strong>
-          <span class="perm-msg">Allow access in your browser to join with video and audio.</span>
+          <span class="perm-msg"
+            >Allow access in your browser to join with video and audio.</span
+          >
         </div>
-        <button class="btn btn-primary btn-sm" id="perm-retry-btn">Try again</button>
-        <button class="btn btn-secondary btn-sm" id="perm-dismiss-btn" onclick="this.closest('.media-perm-banner').style.display='none'">Dismiss</button>
+        <button class="btn btn-primary btn-sm" id="perm-retry-btn">
+          Try again
+        </button>
+        <button class="btn btn-secondary btn-sm" id="perm-dismiss-btn">
+          Dismiss
+        </button>
       </div>
 
       <div class="room-body">
@@ -86,27 +175,23 @@
               <span class="ctrl-icon">🎤</span>
               <span class="ctrl-label">Mute</span>
             </button>
-
             <button class="ctrl-btn" id="ctrl-camera" title="Camera on/off">
               <span class="ctrl-icon">📹</span>
               <span class="ctrl-label">Camera</span>
             </button>
-
-            <button
-              class="ctrl-btn"
-              id="ctrl-share"
-              title="Share your screen"
-            >
+            <button class="ctrl-btn" id="ctrl-share" title="Share your screen">
               <span class="ctrl-icon">🖥</span>
               <span class="ctrl-label">Share</span>
             </button>
-
             <button class="ctrl-btn active" id="ctrl-chat" title="Toggle chat">
               <span class="ctrl-icon">💬</span>
               <span class="ctrl-label">Chat</span>
-              <span id="chat-unread-badge" class="chat-unread-badge" style="display:none;"></span>
+              <span
+                id="chat-unread-badge"
+                class="chat-unread-badge"
+                style="display: none"
+              ></span>
             </button>
-
             <button
               class="ctrl-btn ctrl-btn-leave"
               id="ctrl-leave"
@@ -158,6 +243,100 @@
     </div>
 
     <div id="toast-container"></div>
+
+    <script>
+      window.RoomUI = {
+        addTile: function ({ id, stream, label, muted, camOff, isLocal }) {
+          const grid = document.getElementById("video-grid");
+
+          const existing = document.getElementById("tile-" + id);
+          if (existing) {
+            window.RoomUI.updateTile(id, { stream, muted, camOff });
+            return;
+          }
+
+          const tile = document.createElement("div");
+          tile.className =
+            "video-tile" + (muted ? " muted" : "") + (camOff ? " cam-off" : "");
+          tile.id = "tile-" + id;
+
+          const video = document.createElement("video");
+          video.autoplay = true;
+          video.playsinline = true;
+          video.muted = !!isLocal;
+
+          if (stream) {
+            video.srcObject = stream;
+          }
+
+          const avatar = document.createElement("div");
+          avatar.className = "tile-avatar";
+          avatar.textContent = (label || "U")[0].toUpperCase();
+
+          const labelEl = document.createElement("div");
+          labelEl.className = "tile-label";
+          labelEl.textContent = isLocal ? "You" : label || "Participant";
+
+          const mutedIcon = document.createElement("div");
+          mutedIcon.className = "tile-muted-icon";
+          mutedIcon.textContent = "🔇";
+
+          tile.appendChild(video);
+          tile.appendChild(avatar);
+          tile.appendChild(labelEl);
+          tile.appendChild(mutedIcon);
+          grid.appendChild(tile);
+
+          window.RoomUI.refreshGridCount();
+
+          video.play().catch(function () {
+            tile.addEventListener(
+              "click",
+              function () {
+                video.play();
+              },
+              { once: true },
+            );
+          });
+        },
+
+        removeTile: function (id) {
+          const tile = document.getElementById("tile-" + id);
+          if (tile) {
+            tile.remove();
+            window.RoomUI.refreshGridCount();
+          }
+        },
+
+        updateTile: function (id, { stream, muted, camOff }) {
+          const tile = document.getElementById("tile-" + id);
+          if (!tile) return;
+
+          const video = tile.querySelector("video");
+          if (stream && video.srcObject !== stream) {
+            video.srcObject = stream;
+            video.play().catch(function () {});
+          }
+          if (typeof muted === "boolean") tile.classList.toggle("muted", muted);
+          if (typeof camOff === "boolean")
+            tile.classList.toggle("cam-off", camOff);
+        },
+
+        refreshGridCount: function () {
+          const grid = document.getElementById("video-grid");
+          const count = grid.querySelectorAll(".video-tile").length;
+          grid.className =
+            "video-grid count-" + Math.max(1, Math.min(count, 6));
+          document.getElementById("participant-count").textContent = count;
+        },
+      };
+
+      document
+        .getElementById("perm-dismiss-btn")
+        .addEventListener("click", function () {
+          document.getElementById("media-perm-banner").style.display = "none";
+        });
+    </script>
 
     <script src="/js/api.js"></script>
     <script src="/js/auth.js"></script>

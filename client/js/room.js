@@ -366,33 +366,34 @@ function removeParticipant(userId) {
 function attachStream(userId, stream) {
   const tile = videoGrid.querySelector(`[data-uid="${userId}"]`);
   if (!tile) return;
+
   const video = tile.querySelector("video");
   const avatar = tile.querySelector(".tile-avatar");
-  if (video) {
-    video.srcObject = stream;
-    video.play().catch(() => {});
-    stream.addEventListener("active", () => {
-      if (avatar && stream.getVideoTracks().some((t) => t.enabled && t.readyState === "live")) {
-        avatar.style.display = "none";
-        video.style.display = "block";
-      }
-    });
-    const checkVideo = () => {
-      const hasLiveVideo = stream
-        .getVideoTracks()
-        .some((t) => t.enabled && t.readyState === "live");
-      if (avatar) avatar.style.display = hasLiveVideo ? "none" : "flex";
-      if (video) video.style.display = hasLiveVideo ? "block" : "none";
-    };
-    stream.getVideoTracks().forEach((t) => {
-      t.addEventListener("ended", checkVideo);
-      t.addEventListener("mute", checkVideo);
-      t.addEventListener("unmute", checkVideo);
-    });
-    stream.addEventListener("addtrack", checkVideo);
-    stream.addEventListener("removetrack", checkVideo);
-    checkVideo();
-  }
+
+  if (!video) return;
+
+  video.srcObject = stream;
+
+  video.onloadedmetadata = () => {
+    video.play().catch(console.error);
+  };
+
+  const checkVideo = () => {
+    const hasLiveVideo = stream
+      .getVideoTracks()
+      .some((t) => t.enabled && t.readyState === "live");
+    if (avatar) avatar.style.display = hasLiveVideo ? "none" : "flex";
+    if (video) video.style.display = hasLiveVideo ? "block" : "none";
+  };
+
+  stream.getVideoTracks().forEach((t) => {
+    t.addEventListener("ended", checkVideo);
+    t.addEventListener("mute", checkVideo);
+    t.addEventListener("unmute", checkVideo);
+  });
+  stream.addEventListener("addtrack", checkVideo);
+  stream.addEventListener("removetrack", checkVideo);
+  checkVideo();
 }
 
 function updateGridClass() {
